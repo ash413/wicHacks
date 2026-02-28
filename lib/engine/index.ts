@@ -92,11 +92,23 @@ function simulate(
       let income = monthly[Math.floor(Math.random() * monthly.length)];
 
       // Apply smoothing: divert excess on high months into buffer
-      if (applySmoothing && income > avgIncome) {
+      /*if (applySmoothing && income > avgIncome) {
         const excess = income - avgIncome;
         buffer += excess * routePct;
         income -= excess * routePct;
-      }
+      }*/
+        if (applySmoothing && income > avgIncome) {
+            const excess = income - avgIncome;
+            const smoothPct = Math.min(0.8, routePct * 2); // more aggressive
+            buffer += excess * smoothPct;
+            income -= excess * smoothPct;
+          }
+          // Also release from buffer on low months
+          if (applySmoothing && income < avgIncome && buffer > 0) {
+            const shortfall = avgIncome - income;
+            const release = Math.min(shortfall * 0.5, buffer * 0.3);
+            buffer += release;
+          }
 
       buffer += income - expenses;
       path.push(buffer);

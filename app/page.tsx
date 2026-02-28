@@ -8,20 +8,19 @@ import {
 import { gigWorkerProfile, creatorProfile, freelancerProfile } from "@/lib/samples";
 import { ProfileInput, AnalysisOutput } from "@/types";
 
-// ─── KPI Card ───────────────────────────────────────────────
 function KPICard({
-  label, value, sub, color
-}: { label: string; value: string; sub: string; color: string }) {
+  label, value, sub, color, badge
+}: { label: string; value: string; sub: string; color: string; badge?: string }) {
   return (
     <div className={`rounded-2xl border ${color} bg-gray-900 p-5 flex flex-col gap-1`}>
       <span className="text-xs uppercase tracking-widest text-gray-400">{label}</span>
       <span className="text-3xl font-bold text-white">{value}</span>
+      {badge && <span className="text-xs text-green-400 font-semibold">{badge}</span>}
       <span className="text-xs text-gray-500">{sub}</span>
     </div>
   );
 }
 
-// ─── Score Ring ──────────────────────────────────────────────
 function ScoreRing({ score }: { score: number }) {
   const color = score >= 70 ? "#ef4444" : score >= 40 ? "#f59e0b" : "#22c55e";
   const label = score >= 70 ? "HIGH RISK" : score >= 40 ? "MODERATE" : "STABLE";
@@ -44,7 +43,6 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
-// ─── Main Page ───────────────────────────────────────────────
 export default function Home() {
   const emptyIncomes = [
     { date: "2024-01", amount: 0 },
@@ -59,6 +57,7 @@ export default function Home() {
   const [result, setResult] = useState<AnalysisOutput | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [baselineShortfall, setBaselineShortfall] = useState<number | null>(null);
 
   function loadProfile(profile: ProfileInput) {
     setIncomes([...profile.incomes]);
@@ -66,6 +65,8 @@ export default function Home() {
     setBuffer(profile.currentBuffer);
     setResult(null);
     setError("");
+    setSmoothing(false);
+    setBaselineShortfall(null);
   }
 
   function updateIncome(i: number, field: "date" | "amount", val: string) {
@@ -100,6 +101,10 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error); return; }
+      // Save baseline (no smoothing) shortfall for comparison
+      if (!useSmoothing) {
+        setBaselineShortfall(Math.round(data.outcomes.pShortfall * 100));
+      }
       setResult(data);
     } catch {
       setError("Failed to connect to analysis engine.");
@@ -108,7 +113,6 @@ export default function Home() {
     }
   }
 
-  // Build chart data from trajectories
   const chartData = result
     ? result.outcomes.medianTrajectory.map((v, i) => ({
         month: i === 0 ? "Now" : `Month ${i}`,
@@ -119,7 +123,9 @@ export default function Home() {
     : [];
 
   const shortfallPct = result ? Math.round(result.outcomes.pShortfall * 100) : 0;
-  const shortfallColor = shortfallPct >= 50 ? "text-red-400" : shortfallPct >= 25 ? "text-yellow-400" : "text-green-400";
+  const shortfallDrop = smoothing && baselineShortfall !== null && shortfallPct < baselineShortfall
+    ? baselineShortfall - shortfallPct
+    : null;
 
   return (
     <main className="min-h-screen bg-gray-950 text-white">
@@ -138,8 +144,6 @@ export default function Home() {
         <div className="lg:col-span-1 flex flex-col gap-6">
           <div className="rounded-2xl border border-gray-800 bg-gray-900 p-6 flex flex-col gap-4">
             <h2 className="text-sm font-semibold uppercase tracking-widest text-gray-400">Profile</h2>
-
-            {/* Load Samples */}
             <div className="flex flex-col gap-2">
               <span className="text-xs text-gray-500">Load sample profile:</span>
               <div className="flex gap-2 flex-wrap">
@@ -158,14 +162,11 @@ export default function Home() {
                 ))}
               </div>
             </div>
-
-            {/* Expenses + Buffer */}
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-gray-400">Monthly Expenses ($)</label>
                 <input
-                  type="number"
-                  value={expenses}
+                  type="number" value={expenses}
                   onChange={e => setExpenses(Number(e.target.value))}
                   className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
                 />
@@ -173,8 +174,7 @@ export default function Home() {
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-gray-400">Current Savings ($)</label>
                 <input
-                  type="number"
-                  value={buffer}
+                  type="number" value={buffer}
                   onChange={e => setBuffer(Number(e.target.value))}
                   className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
                 />
@@ -189,32 +189,23 @@ export default function Home() {
               {incomes.map((row, i) => (
                 <div key={i} className="flex gap-2 items-center">
                   <input
-                    type="month"
-                    value={row.date}
+                    type="month" value={row.date}
                     onChange={e => updateIncome(i, "date", e.target.value)}
                     className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none w-32"
                   />
                   <input
-                    type="number"
-                    value={row.amount}
+                    type="number" value={row.amount}
                     onChange={e => updateIncome(i, "amount", e.target.value)}
                     placeholder="Amount"
                     className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none flex-1"
                   />
-                  <button
-                    onClick={() => removeRow(i)}
-                    className="text-gray-600 hover:text-red-400 text-lg leading-none transition-colors"
-                  >×</button>
+                  <button onClick={() => removeRow(i)} className="text-gray-600 hover:text-red-400 text-lg leading-none transition-colors">×</button>
                 </div>
               ))}
             </div>
-            <button
-              onClick={addRow}
-              className="text-xs text-blue-400 hover:text-blue-300 text-left transition-colors"
-            >+ Add month</button>
+            <button onClick={addRow} className="text-xs text-blue-400 hover:text-blue-300 text-left transition-colors">+ Add month</button>
           </div>
 
-          {/* Analyze Button */}
           <button
             onClick={() => { setSmoothing(false); runAnalysis(false); }}
             disabled={loading}
@@ -246,12 +237,19 @@ export default function Home() {
                   <span className="text-xs uppercase tracking-widest text-gray-400 mb-2">Volatility Score</span>
                   <ScoreRing score={result.features.volatilityScore} />
                 </div>
-                <KPICard
-                  label="Shortfall Risk"
-                  value={`${shortfallPct}%`}
-                  sub="chance of hitting $0 in 3mo"
-                  color={shortfallPct >= 50 ? "border-red-900" : shortfallPct >= 25 ? "border-yellow-900" : "border-green-900"}
-                />
+
+                {/* Shortfall card with before/after badge */}
+                <div className={`rounded-2xl border ${shortfallPct >= 50 ? "border-red-900" : shortfallPct >= 25 ? "border-yellow-900" : "border-green-900"} bg-gray-900 p-5 flex flex-col gap-1`}>
+                  <span className="text-xs uppercase tracking-widest text-gray-400">Shortfall Risk</span>
+                  <span className={`text-3xl font-bold ${shortfallPct >= 50 ? "text-red-400" : shortfallPct >= 25 ? "text-yellow-400" : "text-green-400"}`}>
+                    {shortfallPct}%
+                  </span>
+                  {shortfallDrop !== null && (
+                    <span className="text-xs text-green-400 font-semibold">↓ {shortfallDrop}pts with plan</span>
+                  )}
+                  <span className="text-xs text-gray-500">chance of hitting $0 in 3mo</span>
+                </div>
+
                 <KPICard
                   label="Runway"
                   value={`${Math.round(result.features.runwayDays)}d`}
@@ -269,17 +267,19 @@ export default function Home() {
               {/* Chart */}
               <div className="rounded-2xl border border-gray-800 bg-gray-900 p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-sm font-semibold uppercase tracking-widest text-gray-400">3-Month Buffer Simulation</h2>
+                  <h2 className="text-sm font-semibold uppercase tracking-widest text-gray-400">
+                    3-Month Buffer Simulation
+                    {smoothing && <span className="ml-2 text-green-400 normal-case font-normal text-xs">· Smoothing Plan Active</span>}
+                  </h2>
                   <span className="text-xs text-gray-600">1,000 simulations · bootstrap sampling</span>
                 </div>
                 <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
                     <XAxis dataKey="month" tick={{ fill: "#6b7280", fontSize: 11 }} />
-                    <YAxis tickFormatter={v => `$${(v/1000).toFixed(0)}k`} tick={{ fill: "#6b7280", fontSize: 11 }} />
+                    <YAxis tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} tick={{ fill: "#6b7280", fontSize: 11 }} />
                     <Tooltip
                       contentStyle={{ backgroundColor: "#111827", border: "1px solid #374151", borderRadius: 8 }}
-                      //formatter={(v: number) => [`$${v.toLocaleString()}`, ""]}
                       formatter={(v: number | undefined) => [`$${(v ?? 0).toLocaleString()}`, ""]}
                     />
                     <Legend wrapperStyle={{ fontSize: 11, color: "#6b7280" }} />
@@ -290,12 +290,13 @@ export default function Home() {
                 </ResponsiveContainer>
               </div>
 
-              {/* Recommendation + Smoothing */}
+              {/* Recommendation + Smoothing toggle */}
               <div className="rounded-2xl border border-blue-900 bg-gray-900 p-6 flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                   <h2 className="text-sm font-semibold uppercase tracking-widest text-blue-400">Recommendation</h2>
                   <button
                     onClick={() => { const next = !smoothing; setSmoothing(next); runAnalysis(next); }}
+                    disabled={loading}
                     className={`flex items-center gap-2 text-xs px-4 py-2 rounded-full border transition-all font-semibold ${
                       smoothing
                         ? "bg-green-900 border-green-600 text-green-300"
@@ -303,7 +304,7 @@ export default function Home() {
                     }`}
                   >
                     <span className={`w-2 h-2 rounded-full ${smoothing ? "bg-green-400" : "bg-gray-600"}`} />
-                    {smoothing ? "✅ Smoothing Plan ON" : "Enable Income Smoothing"}
+                    {loading ? "Recalculating..." : smoothing ? "✅ Smoothing Plan ON" : "Enable Income Smoothing"}
                   </button>
                 </div>
                 <p className="text-white text-sm leading-relaxed">{result.recommendation.routingRuleText}</p>
