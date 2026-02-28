@@ -44,4 +44,22 @@ export interface IncomePoint {
     outcomes: SimOutcomes;
     recommendation: Recommendation;
     explanation: string[];
+    allocationPlan: AllocationPlan;
+  }
+
+  export interface AllocationRow {
+    month: string;
+    income: number;
+    toBuffer: number;
+    fromBuffer: number;
+    available: number;
+    bufferAfter: number;
+    action: "deposit" | "release" | "neutral";
+  }
+  
+  export interface AllocationPlan {
+    rows: AllocationRow[];
+    totalDeposited: number;
+    totalReleased: number;
+    projectedBufferEnd: number;
   }

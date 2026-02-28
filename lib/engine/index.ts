@@ -1,4 +1,4 @@
-import { ProfileInput, Features, SimOutcomes, Recommendation, AnalysisOutput } from "@/types";
+import { ProfileInput, Features, SimOutcomes, Recommendation, AnalysisOutput, AllocationPlan, AllocationRow } from "@/types";
 
 // ─── Helpers ────────────────────────────────────────────────
 function clamp(min: number, max: number, val: number) {
@@ -171,25 +171,80 @@ function explain(features: Features, outcomes: SimOutcomes, rec: Recommendation)
 }
 
 // ─── Main Entry Point ─────────────────────────────────────────
-export function analyze(input: ProfileInput): AnalysisOutput {
-  const monthly = toMonthlyIncome(input.incomes);
-  if (monthly.length === 0) throw new Error("No valid income data provided.");
 
-  const features = computeFeatures(monthly, input.monthlyExpenses, input.currentBuffer);
-  const rec = recommend(features, input.monthlyExpenses, input.currentBuffer);
+function buildAllocationPlan(
+    incomes: { date: string; amount: number }[],
+    monthlyIncome: number[],
+    expenses: number,
+    startBuffer: number,
+    rec: Recommendation
+  ): AllocationPlan {
+    // Use actual historical income data sorted by date
+    const sorted = [...incomes].sort((a, b) => a.date.localeCompare(b.date));
+    
+    let buffer = startBuffer;
+    let totalDeposited = 0;
+    let totalReleased = 0;
+    const rows: AllocationRow[] = [];
+  
+    for (const entry of sorted) {
+      const income = entry.amount;
+      const avg = mean(monthlyIncome);
+      let toBuffer = 0;
+      let fromBuffer = 0;
+  
+      if (income > avg) {
+        // High month: deposit surplus into buffer
+        const excess = income - avg;
+        const smoothPct = Math.min(0.8, rec.routePct * 2);
+        toBuffer = Math.round(excess * smoothPct);
+        buffer += toBuffer;
+        totalDeposited += toBuffer;
+      } else if (income < expenses) {
+        // Low month: release from buffer to cover gap
+        const gap = expenses - income;
+        fromBuffer = Math.min(Math.round(gap * 0.5), Math.round(buffer * 0.3));
+        buffer = Math.max(0, buffer - fromBuffer);
+        totalReleased += fromBuffer;
+      }
+  
+      const available = income - toBuffer + fromBuffer;
+  
+      rows.push({
+        month: entry.date,
+        income: Math.round(income),
+        toBuffer,
+        fromBuffer,
+        available: Math.round(available),
+        bufferAfter: Math.round(buffer),
+        action: toBuffer > 0 ? "deposit" : fromBuffer > 0 ? "release" : "neutral",
+      });
+    }
+  
+    return {
+      rows,
+      totalDeposited,
+      totalReleased,
+      projectedBufferEnd: Math.round(buffer),
+    };
+  }
 
-  const outcomes = simulate(
-    monthly,
-    input.monthlyExpenses,
-    input.currentBuffer,
-    input.simulations,
-    input.horizonMonths,
-    input.applySmoothing ?? false,
-    rec.routePct,
-    features.avgIncome
-  );
-
-  const explanation = explain(features, outcomes, rec);
-
-  return { features, outcomes, recommendation: rec, explanation };
-}
+  export function analyze(input: ProfileInput): AnalysisOutput {
+    const monthly = toMonthlyIncome(input.incomes);
+    if (monthly.length === 0) throw new Error("No valid income data provided.");
+  
+    const features = computeFeatures(monthly, input.monthlyExpenses, input.currentBuffer);
+    const rec = recommend(features, input.monthlyExpenses, input.currentBuffer);
+    const outcomes = simulate(
+      monthly, input.monthlyExpenses, input.currentBuffer,
+      input.simulations, input.horizonMonths,
+      input.applySmoothing ?? false, rec.routePct, features.avgIncome
+    );
+    const explanation = explain(features, outcomes, rec);
+    const allocationPlan = buildAllocationPlan(   // ← add this
+      input.incomes, monthly, input.monthlyExpenses,
+      input.currentBuffer, rec
+    );
+  
+    return { features, outcomes, recommendation: rec, explanation, allocationPlan };
+  }
