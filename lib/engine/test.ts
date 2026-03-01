@@ -1,5 +1,7 @@
+import { readFileSync } from "fs";
 import { analyze } from "./index";
 import { gigWorkerProfile, creatorProfile, freelancerProfile } from "../samples/index";
+import { parseCSV } from "../adapters/csv";
 
 function printResult(label: string, input: typeof gigWorkerProfile) {
   console.log("\n" + "=".repeat(60));
@@ -34,24 +36,23 @@ function printResult(label: string, input: typeof gigWorkerProfile) {
     console.log("\n📝 EXPLANATION:");
     result.explanation.forEach((line, i) => console.log(`  ${i + 1}. ${line}`));
 
-    // Sanity checks
     console.log("\n✅ SANITY CHECKS:");
-    console.log(`  pShortfall in [0,1]:     ${result.outcomes.pShortfall >= 0 && result.outcomes.pShortfall <= 1 ? "PASS" : "FAIL"}`);
+    console.log(`  pShortfall in [0,1]:        ${result.outcomes.pShortfall >= 0 && result.outcomes.pShortfall <= 1 ? "PASS" : "FAIL"}`);
     console.log(`  volatilityScore in [0,100]: ${result.features.volatilityScore >= 0 && result.features.volatilityScore <= 100 ? "PASS" : "FAIL"}`);
     console.log(`  trajectory length = horizon+1: ${result.outcomes.medianTrajectory.length === input.horizonMonths + 1 ? "PASS" : "FAIL"}`);
-    console.log(`  targetBuffer > 0:        ${result.recommendation.targetBuffer > 0 ? "PASS" : "FAIL"}`);
+    console.log(`  targetBuffer > 0:           ${result.recommendation.targetBuffer > 0 ? "PASS" : "FAIL"}`);
 
   } catch (err) {
     console.log(`  ❌ ERROR: ${err}`);
   }
 }
 
-// Run all three profiles
+// ── 12-month sample profiles ──────────────────────────────────
 printResult("Gig Worker", gigWorkerProfile);
 printResult("Creator", creatorProfile);
 printResult("Freelancer", freelancerProfile);
 
-// Test: smoothing should reduce shortfall probability
+// ── Smoothing test ────────────────────────────────────────────
 console.log("\n" + "=".repeat(60));
 console.log("TEST: Smoothing reduces shortfall probability");
 console.log("=".repeat(60));
@@ -63,7 +64,7 @@ console.log(`  Without smoothing: ${Math.round(withoutSmoothing.outcomes.pShortf
 console.log(`  With smoothing:    ${Math.round(withSmoothing.outcomes.pShortfall * 100)}% shortfall`);
 console.log(`  Smoothing helped:  ${withSmoothing.outcomes.pShortfall <= withoutSmoothing.outcomes.pShortfall ? "✅ PASS" : "⚠️  FAIL (random variance — run again)"}`);
 
-// Test: edge case — empty incomes
+// ── Edge case ─────────────────────────────────────────────────
 console.log("\n" + "=".repeat(60));
 console.log("TEST: Edge case — empty incomes");
 console.log("=".repeat(60));
@@ -72,4 +73,118 @@ try {
   console.log("  ❌ FAIL: Should have thrown error");
 } catch (e) {
   console.log(`  ✅ PASS: Correctly threw error: "${e}"`);
+}
+
+// ── 60-month CSV profiles ─────────────────────────────────────
+console.log("\n" + "=".repeat(60));
+console.log("TEST: 60-month Creator profile (CSV)");
+console.log("=".repeat(60));
+
+try {
+  const csvText = readFileSync("public/data/creator_60mo.csv", "utf-8");
+  const incomes = parseCSV(csvText);
+
+  const result60 = analyze({
+    incomes,
+    monthlyExpenses: 2500,
+    currentBuffer: 2000,
+    horizonMonths: 3,
+    simulations: 2000,
+    applySmoothing: false,
+  });
+
+  const result60Smoothed = analyze({
+    incomes,
+    monthlyExpenses: 2500,
+    currentBuffer: 2000,
+    horizonMonths: 3,
+    simulations: 2000,
+    applySmoothing: true,
+  });
+
+  console.log(`  Months of data:       ${incomes.length}`);
+  console.log(`  Avg Income:           $${Math.round(result60.features.avgIncome).toLocaleString()}`);
+  console.log(`  CV (volatility):      ${result60.features.cv.toFixed(3)}`);
+  console.log(`  Volatility Score:     ${result60.features.volatilityScore}/100`);
+  console.log(`  Shortfall (no plan):  ${Math.round(result60.outcomes.pShortfall * 100)}%`);
+  console.log(`  Shortfall (w/ plan):  ${Math.round(result60Smoothed.outcomes.pShortfall * 100)}%`);
+  console.log(`  Risk reduction:       ${Math.round((result60.outcomes.pShortfall - result60Smoothed.outcomes.pShortfall) * 100)}pts`);
+  //console.log(`  Baseline in output:   $${Math.round(result60.baselineShortfall * 100)}% (should match no-plan)`);
+  console.log(`  Baseline in output:   ${Math.round(result60.baselineShortfall * 100)}% (should match no-plan)`);
+} catch (e) {
+  console.log(`  ❌ ERROR: ${e}`);
+}
+
+// ── 60-month Gig Worker ───────────────────────────────────────
+console.log("\n" + "=".repeat(60));
+console.log("TEST: 60-month Gig Worker profile (CSV)");
+console.log("=".repeat(60));
+
+try {
+  const csvText = readFileSync("public/data/gig_60mo.csv", "utf-8");
+  const incomes = parseCSV(csvText);
+
+  const result60 = analyze({
+    incomes,
+    monthlyExpenses: 2200,
+    currentBuffer: 1800,
+    horizonMonths: 3,
+    simulations: 2000,
+    applySmoothing: false,
+  });
+
+  const result60Smoothed = analyze({
+    incomes,
+    monthlyExpenses: 2200,
+    currentBuffer: 1800,
+    horizonMonths: 3,
+    simulations: 2000,
+    applySmoothing: true,
+  });
+
+  console.log(`  Months of data:       ${incomes.length}`);
+  console.log(`  Avg Income:           $${Math.round(result60.features.avgIncome).toLocaleString()}`);
+  console.log(`  Volatility Score:     ${result60.features.volatilityScore}/100`);
+  console.log(`  Shortfall (no plan):  ${Math.round(result60.outcomes.pShortfall * 100)}%`);
+  console.log(`  Shortfall (w/ plan):  ${Math.round(result60Smoothed.outcomes.pShortfall * 100)}%`);
+  console.log(`  Risk reduction:       ${Math.round((result60.outcomes.pShortfall - result60Smoothed.outcomes.pShortfall) * 100)}pts`);
+} catch (e) {
+  console.log(`  ❌ ERROR: ${e}`);
+}
+
+// ── 60-month Freelancer ───────────────────────────────────────
+console.log("\n" + "=".repeat(60));
+console.log("TEST: 60-month Freelancer profile (CSV)");
+console.log("=".repeat(60));
+
+try {
+  const csvText = readFileSync("public/data/freelancer_60mo.csv", "utf-8");
+  const incomes = parseCSV(csvText);
+
+  const result60 = analyze({
+    incomes,
+    monthlyExpenses: 2800,
+    currentBuffer: 5000,
+    horizonMonths: 3,
+    simulations: 2000,
+    applySmoothing: false,
+  });
+
+  const result60Smoothed = analyze({
+    incomes,
+    monthlyExpenses: 2800,
+    currentBuffer: 5000,
+    horizonMonths: 3,
+    simulations: 2000,
+    applySmoothing: true,
+  });
+
+  console.log(`  Months of data:       ${incomes.length}`);
+  console.log(`  Avg Income:           $${Math.round(result60.features.avgIncome).toLocaleString()}`);
+  console.log(`  Volatility Score:     ${result60.features.volatilityScore}/100`);
+  console.log(`  Shortfall (no plan):  ${Math.round(result60.outcomes.pShortfall * 100)}%`);
+  console.log(`  Shortfall (w/ plan):  ${Math.round(result60Smoothed.outcomes.pShortfall * 100)}%`);
+  console.log(`  Risk reduction:       ${Math.round((result60.outcomes.pShortfall - result60Smoothed.outcomes.pShortfall) * 100)}pts`);
+} catch (e) {
+  console.log(`  ❌ ERROR: ${e}`);
 }

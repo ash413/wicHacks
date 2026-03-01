@@ -45,7 +45,10 @@ export interface IncomePoint {
     recommendation: Recommendation;
     explanation: string[];
     allocationPlan: AllocationPlan;
+    baselineShortfall: number;
   }
+
+  //update 2
 
   export interface AllocationRow {
     month: string;
@@ -62,4 +65,11 @@ export interface IncomePoint {
     totalDeposited: number;
     totalReleased: number;
     projectedBufferEnd: number;
+  }
+
+  //update 3
+
+  export interface ExtendedProfileInput extends ProfileInput {
+    label?: string;
+    csvFile?: string;
   }

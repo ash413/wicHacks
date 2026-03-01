@@ -17,7 +17,8 @@ export async function POST(req: NextRequest) {
       monthlyExpenses: Number(body.monthlyExpenses),
       currentBuffer: Number(body.currentBuffer ?? 0),
       horizonMonths: Number(body.horizonMonths ?? 3),
-      simulations: Number(body.simulations ?? 1000),
+      //simulations: Number(body.simulations ?? 1000),
+      simulations: Number(body.simulations ?? 2000),
       applySmoothing: Boolean(body.applySmoothing ?? false),
     };
 

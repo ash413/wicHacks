@@ -72,7 +72,7 @@ function computeFeatures(monthly: number[], expenses: number, buffer: number): F
 }
 
 // ─── Monte Carlo Simulation (bootstrap) ─────────────────────
-function simulate(
+/*function simulate(
   monthly: number[],
   expenses: number,
   startBuffer: number,
@@ -100,7 +100,7 @@ function simulate(
         buffer += excess * routePct;
         income -= excess * routePct;
       }*/
-        if (applySmoothing && income > avgIncome) {
+        /*if (applySmoothing && income > avgIncome) {
             const excess = income - avgIncome;
             const smoothPct = Math.min(0.8, routePct * 2); // more aggressive
             buffer += excess * smoothPct;
@@ -112,7 +112,7 @@ function simulate(
             const release = Math.min(shortfall * 0.5, buffer * 0.3);
             buffer += release;
           }*/
-          if (applySmoothing && income < avgIncome && buffer > 0) {
+          /*if (applySmoothing && income < avgIncome && buffer > 0) {
             const gap = avgIncome - income;
             const release = Math.min(gap * 0.5, buffer * 0.3);
             buffer -= release;     // buffer goes down
@@ -135,6 +135,146 @@ function simulate(
 
   for (let m = 0; m <= horizon; m++) {
     const vals = trajectories.map((t) => t[m]).sort((a, b) => a - b);
+    medianTraj.push(percentile(vals, 50));
+    p10Traj.push(percentile(vals, 10));
+    p90Traj.push(percentile(vals, 90));
+  }
+
+  return {
+    pShortfall: shortfallCount / n,
+    medianTrajectory: medianTraj,
+    p10Trajectory: p10Traj,
+    p90Trajectory: p90Traj,
+    endBufferMedian: medianTraj[horizon],
+  };
+}*/
+
+// ─── Pre-generate CRN seeds ──────────────────────────────────
+export function generateSeeds(n: number, horizon: number): number[][] {
+  const seeds: number[][] = [];
+  for (let i = 0; i < n; i++) {
+    const path: number[] = [];
+    for (let t = 0; t < horizon; t++) {
+      path.push(Math.random());
+    }
+    seeds.push(path);
+  }
+  return seeds;
+}
+
+// ─── Seasonal bootstrap helper ───────────────────────────────
+function buildSeasonalBuckets(
+  monthly: number[],
+  startDate: string
+): Map<number, number[]> {
+  const buckets = new Map<number, number[]>();
+  
+  // initialize all 12 months
+  for (let m = 0; m < 12; m++) buckets.set(m, []);
+  
+  // parse start month
+  const [startYear, startMonth] = startDate.split("-").map(Number);
+  
+  monthly.forEach((amount, idx) => {
+    const monthOfYear = (startMonth - 1 + idx) % 12; // 0-indexed
+    buckets.get(monthOfYear)!.push(amount);
+  });
+  
+  return buckets;
+}
+
+function sampleFromBucket(
+  buckets: Map<number, number[]>,
+  monthOfYear: number, // 0-indexed
+  seed: number,        // 0-1 random number (pre-generated CRN)
+  fullPool: number[]   // fallback
+): number {
+  // Try exact month bucket
+  let pool = buckets.get(monthOfYear) ?? [];
+  
+  // If bucket too small, expand to ±1 month
+  if (pool.length < 3) {
+    const prev = buckets.get((monthOfYear + 11) % 12) ?? [];
+    const next = buckets.get((monthOfYear + 1) % 12) ?? [];
+    pool = [...pool, ...prev, ...next];
+  }
+  
+  // Final fallback: full pool
+  if (pool.length === 0) pool = fullPool;
+  
+  const idx = Math.floor(seed * pool.length);
+  return pool[Math.min(idx, pool.length - 1)];
+}
+
+// ─── Monte Carlo Simulation (CRN + Seasonal Bootstrap) ───────
+function simulate(
+  monthly: number[],
+  expenses: number,
+  startBuffer: number,
+  n: number,
+  horizon: number,
+  applySmoothing: boolean,
+  routePct: number,
+  avgIncome: number,
+  seeds?: number[][]  // pre-generated CRN seeds
+): SimOutcomes {
+  // Build seasonal buckets from income history
+  // We don't have the original start date here, use index-based
+  const buckets = new Map<number, number[]>();
+  for (let m = 0; m < 12; m++) buckets.set(m, []);
+  monthly.forEach((amount, idx) => {
+    const monthOfYear = idx % 12;
+    buckets.get(monthOfYear)!.push(amount);
+  });
+
+  const trajectories: number[][] = [];
+  let shortfallCount = 0;
+
+  // Use provided seeds (CRN) or generate fresh ones
+  const usedSeeds = seeds ?? generateSeeds(n, horizon);
+
+  for (let i = 0; i < n; i++) {
+    let buffer = startBuffer;
+    const path: number[] = [buffer];
+    let hitShortfall = false;
+
+    for (let t = 0; t < horizon; t++) {
+      const seed = usedSeeds[i]?.[t] ?? Math.random();
+      const monthOfYear = t % 12;
+      
+      // Seasonal bootstrap sample
+      let income = sampleFromBucket(buckets, monthOfYear, seed, monthly);
+
+      // Apply smoothing
+      if (applySmoothing && income > avgIncome) {
+        const excess = income - avgIncome;
+        const smoothPct = Math.min(0.8, routePct * 2);
+        buffer += excess * smoothPct;
+        income -= excess * smoothPct;
+      }
+
+      if (applySmoothing && income < avgIncome && buffer > 0) {
+        const shortfall = avgIncome - income;
+        const release = Math.min(shortfall * 0.5, buffer * 0.3);
+        buffer += release;
+      }
+
+      buffer += income - expenses;
+      path.push(buffer);
+      if (buffer < 0) hitShortfall = true;
+    }
+
+    trajectories.push(path);
+    if (hitShortfall) shortfallCount++;
+  }
+
+  // Compute percentile trajectories
+  const medianTraj: number[] = [];
+  const p10Traj: number[] = [];
+  const p90Traj: number[] = [];
+
+  for (let m = 0; m <= horizon; m++) {
+    const vals = trajectories.map(t => t[m]).sort((a, b) => a - b);
     medianTraj.push(percentile(vals, 50));
     p10Traj.push(percentile(vals, 10));
     p90Traj.push(percentile(vals, 90));
@@ -238,7 +378,7 @@ function buildAllocationPlan(
     };
   }
 
-  export function analyze(input: ProfileInput): AnalysisOutput {
+  /*export function analyze(input: ProfileInput): AnalysisOutput {
     const monthly = toMonthlyIncome(input.incomes);
     if (monthly.length === 0) throw new Error("No valid income data provided.");
   
@@ -256,4 +396,47 @@ function buildAllocationPlan(
     );
   
     return { features, outcomes, recommendation: rec, explanation, allocationPlan };
-  }
+  }*/
+
+    export function analyze(input: ProfileInput): AnalysisOutput {
+      const monthly = toMonthlyIncome(input.incomes);
+      if (monthly.length === 0) throw new Error("No valid income data provided.");
+    
+      const features = computeFeatures(monthly, input.monthlyExpenses, input.currentBuffer);
+      const rec = recommend(features, input.monthlyExpenses, input.currentBuffer);
+    
+      // Generate CRN seeds ONCE — reused for both baseline and smoothing
+      const n = input.simulations ?? 2000;
+      const horizon = input.horizonMonths ?? 3;
+      const seeds = generateSeeds(n, horizon);
+    
+      // Baseline (no smoothing) — uses seeds
+      const baselineOutcomes = simulate(
+        monthly, input.monthlyExpenses, input.currentBuffer,
+        n, horizon, false, rec.routePct, features.avgIncome, seeds
+      );
+    
+      // Smoothing outcomes — same seeds, different policy
+      const smoothingOutcomes = simulate(
+        monthly, input.monthlyExpenses, input.currentBuffer,
+        n, horizon, true, rec.routePct, features.avgIncome, seeds
+      );
+    
+      // Return whichever the user requested, but always include baseline shortfall
+      const outcomes = input.applySmoothing ? smoothingOutcomes : baselineOutcomes;
+      
+      const explanation = explain(features, outcomes, rec);
+      const allocationPlan = buildAllocationPlan(
+        input.incomes, monthly, input.monthlyExpenses,
+        input.currentBuffer, rec
+      );
+    
+      return {
+        features,
+        outcomes,
+        recommendation: rec,
+        explanation,
+        allocationPlan,
+        baselineShortfall: baselineOutcomes.pShortfall, // always included
+      };
+    }

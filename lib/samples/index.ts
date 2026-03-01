@@ -1,10 +1,10 @@
 import { ProfileInput } from "@/types";
 
 export const gigWorkerProfile: ProfileInput = {
-  monthlyExpenses: 3200,
+  monthlyExpenses: 2200,
   currentBuffer: 1800,
   horizonMonths: 3,
-  simulations: 1000,
+  simulations: 2000,
   incomes: [
     { date: "2024-01", amount: 2100 },
     { date: "2024-02", amount: 4800 },
@@ -22,10 +22,10 @@ export const gigWorkerProfile: ProfileInput = {
 };
 
 export const creatorProfile: ProfileInput = {
-  monthlyExpenses: 4500,
+  monthlyExpenses: 2500,
   currentBuffer: 2000,
   horizonMonths: 3,
-  simulations: 1000,
+  simulations: 2000,
   incomes: [
     { date: "2024-01", amount: 800 },
     { date: "2024-02", amount: 12000 },
@@ -46,7 +46,7 @@ export const freelancerProfile: ProfileInput = {
   monthlyExpenses: 2800,
   currentBuffer: 5000,
   horizonMonths: 3,
-  simulations: 1000,
+  simulations: 2000,
   incomes: [
     { date: "2024-01", amount: 5500 },
     { date: "2024-02", amount: 3200 },

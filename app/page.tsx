@@ -193,7 +193,8 @@ export default function Home() {
   const [result, setResult] = useState<AnalysisOutput | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [baselineShortfall, setBaselineShortfall] = useState<number | null>(null);
+  //const [baselineShortfall, setBaselineShortfall] = useState<number | null>(null);
+  
 
   function loadProfile(profile: ProfileInput) {
     setIncomes([...profile.incomes]);
@@ -202,7 +203,7 @@ export default function Home() {
     setResult(null);
     setError("");
     setSmoothing(false);
-    setBaselineShortfall(null);
+    //setBaselineShortfall(null);
   }
 
   function updateIncome(i: number, field: "date" | "amount", val: string) {
@@ -238,9 +239,9 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) { setError(data.error); return; }
       // Save baseline (no smoothing) shortfall for comparison
-      if (!useSmoothing) {
+      /*if (!useSmoothing) {
         setBaselineShortfall(Math.round(data.outcomes.pShortfall * 100));
-      }
+      }*/
       setResult(data);
     } catch {
       setError("Failed to connect to analysis engine.");
@@ -259,8 +260,11 @@ export default function Home() {
     : [];
 
   const shortfallPct = result ? Math.round(result.outcomes.pShortfall * 100) : 0;
-  const shortfallDrop = smoothing && baselineShortfall !== null && shortfallPct < baselineShortfall
+  /*const shortfallDrop = smoothing && baselineShortfall !== null && shortfallPct < baselineShortfall
     ? baselineShortfall - shortfallPct
+    : null;*/
+    const shortfallDrop = smoothing && result?.baselineShortfall !== undefined
+    ? Math.round(result.baselineShortfall * 100) - shortfallPct
     : null;
 
   return (
