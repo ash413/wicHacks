@@ -135,6 +135,52 @@ function FlowDiagram({ avg, expenses, routePct, currentBuffer, targetBuffer }: {
   );
 }
 
+function BacktestSummary({ rows, expenses, startBuffer }: {
+  rows: import("@/types").AllocationRow[];
+  expenses: number;
+  startBuffer: number;
+}) {
+  const coveredMonths = rows.filter(r => r.available >= expenses).length;
+  const totalMonths = rows.length;
+  const endBuffer = rows[rows.length - 1]?.bufferAfter ?? startBuffer;
+  const bufferGrowth = endBuffer - startBuffer;
+  const shortfallMonths = rows.filter(r => r.bufferAfter < 0).length;
+
+  return (
+    <div className="rounded-xl bg-blue-950/30 border border-blue-800/50 p-4 flex flex-col gap-2 mb-4">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-widest text-blue-400">📈 Backtest</span>
+        <span className="text-xs text-gray-500">— if you had followed this plan historically:</span>
+      </div>
+      <div className="grid grid-cols-3 gap-3 text-center mt-1">
+        <div className="bg-gray-900 rounded-lg p-2">
+          <div className="text-lg font-bold text-white">{coveredMonths}/{totalMonths}</div>
+          <div className="text-xs text-gray-500">months fully covered</div>
+        </div>
+        <div className="bg-gray-900 rounded-lg p-2">
+          <div className={`text-lg font-bold ${bufferGrowth >= 0 ? "text-green-400" : "text-red-400"}`}>
+            {bufferGrowth >= 0 ? "+" : ""}${bufferGrowth.toLocaleString()}
+          </div>
+          <div className="text-xs text-gray-500">buffer change</div>
+        </div>
+        <div className="bg-gray-900 rounded-lg p-2">
+          <div className={`text-lg font-bold ${shortfallMonths === 0 ? "text-green-400" : "text-yellow-400"}`}>
+            {shortfallMonths}
+          </div>
+          <div className="text-xs text-gray-500">months buffer went negative</div>
+        </div>
+      </div>
+      <p className="text-xs text-gray-400 mt-1">
+        This routing policy would have grown your buffer from{" "}
+        <span className="text-white font-semibold">${startBuffer.toLocaleString()}</span> to{" "}
+        <span className="text-green-400 font-semibold">${endBuffer.toLocaleString()}</span> over{" "}
+        {totalMonths} months — covering expenses in{" "}
+        <span className="text-white font-semibold">{coveredMonths} of {totalMonths} months</span>.
+      </p>
+    </div>
+  );
+}
+
 // ─── Allocation Table ────────────────────────────────────────
 function AllocationTable({ rows, expenses }: { rows: import("@/types").AllocationRow[]; expenses: number; }) {
   return (
@@ -655,6 +701,11 @@ export default function Home() {
                       <span className="text-orange-400">↓ Total released: ${result.allocationPlan.totalReleased.toLocaleString()}</span>
                     </div>
                   </div>
+                  <BacktestSummary
+                    rows={result.allocationPlan.rows}
+                    expenses={expenses}
+                    startBuffer={buffer}
+                  />
                   <AllocationTable rows={result.allocationPlan.rows} expenses={expenses} />
                 </div>
               </div>
