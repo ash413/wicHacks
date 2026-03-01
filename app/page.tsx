@@ -185,7 +185,7 @@ function BacktestSummary({ rows, expenses, startBuffer }: {
 function AllocationTable({ rows, expenses }: { rows: import("@/types").AllocationRow[]; expenses: number; }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-xs">
+      <table className="w-full text-xmin-w-[720px]">
         <thead>
           <tr className="text-gray-500 uppercase tracking-widest border-b border-gray-800">
             <th className="text-left py-2 pr-4">Month</th>
@@ -439,19 +439,19 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-950 text-white">
       {/* Header */}
-      <div className="border-b border-gray-800 px-8 py-5 flex items-center justify-between">
+      <div className="border-b border-gray-800 px-4 sm:px-8 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Income Firewall 🔥</h1>
           <p className="text-sm text-gray-400 mt-0.5">Cash Flow Volatility Risk Engine</p>
         </div>
-        <span className="text-xs text-gray-600 border border-gray-800 rounded-full px-3 py-1">Prototype · Not Financial Advice</span>
+        <span className="text-[11px] text-gray-600 border border-gray-800 rounded-full px-3 py-1 w-fit">Prototype · Not Financial Advice</span>
       </div>
 
-      <div className="max-w-7xl mx-auto px-8 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 py-6 sm:py-8 grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
 
         {/* ── LEFT: Inputs ── */}
         <div className="lg:col-span-1 flex flex-col gap-6">
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-6 flex flex-col gap-4">
+          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4 sm:p-6 flex flex-col gap-4">
             <h2 className="text-sm font-semibold uppercase tracking-widest text-gray-400">Profile</h2>
 
             {/* 1-year sample profiles */}
@@ -466,7 +466,7 @@ export default function Home() {
                 <button
                   key={label}
                   onClick={() => { loadProfile(profile); setActiveNessieKey(nessieKey); }}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
+                  className="text-xs px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors w-full sm:w-auto"
                 >
                   {label}
                 </button>
@@ -486,7 +486,7 @@ export default function Home() {
                   <button
                     key={label}
                     onClick={() => load60Profile(profile)}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-blue-950 hover:bg-blue-900 border border-blue-800 text-blue-300 transition-colors"
+                    className="text-xs px-3 py-1.5 rounded-lg bg-blue-950 hover:bg-blue-900 border border-blue-800 text-blue-300 transition-colors w-full sm:w-auto"
                   >
                     {label}
                   </button>
@@ -544,19 +544,19 @@ export default function Home() {
             <h2 className="text-sm font-semibold uppercase tracking-widest text-gray-400">Income History</h2>
             <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-1">
               {incomes.map((row, i) => (
-                <div key={i} className="flex gap-2 items-center">
+                <div key={i} className="flex flex-col sm:flex-row gap-2 sm:items-center">
                   <input
                     type="month" value={row.date}
                     onChange={e => updateIncome(i, "date", e.target.value)}
-                    className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none w-32"
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none w-full sm:w-32"
                   />
                   <input
                     type="number" value={row.amount}
                     onChange={e => updateIncome(i, "amount", e.target.value)}
                     placeholder="Amount"
-                    className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none flex-1"
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none w-full sm:flex-1"
                   />
-                  <button onClick={() => removeRow(i)} className="text-gray-600 hover:text-red-400 text-lg leading-none transition-colors">×</button>
+                  <button onClick={() => removeRow(i)} className="text-gray-600 hover:text-red-400 text-lg leading-none transition-colors self-end sm:self-auto">×</button>
                 </div>
               ))}
             </div>
@@ -589,8 +589,8 @@ export default function Home() {
           {result && (
             <>
               {/* KPI Row */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="col-span-2 md:col-span-1 rounded-2xl border border-gray-800 bg-gray-900 p-5 flex flex-col items-center justify-center">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="col-span-1 sm:col-span-2 lg:col-span-1 rounded-2xl border border-gray-800 bg-gray-900 p-5 flex flex-col items-center justify-center">
                   <span className="text-xs uppercase tracking-widest text-gray-400 mb-2">Volatility Score</span>
                   <ScoreRing score={result.features.volatilityScore} />
                 </div>
@@ -630,21 +630,23 @@ export default function Home() {
                   </h2>
                   <span className="text-xs text-gray-600">2,000 simulations · bootstrap sampling</span>
                 </div>
-                <ResponsiveContainer width="100%" height={220}>
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-                    <XAxis dataKey="month" tick={{ fill: "#6b7280", fontSize: 11 }} />
-                    <YAxis tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} tick={{ fill: "#6b7280", fontSize: 11 }} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: "#111827", border: "1px solid #374151", borderRadius: 8 }}
-                      formatter={(v: number | undefined) => [`$${(v ?? 0).toLocaleString()}`, ""]}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 11, color: "#6b7280" }} />
-                    <Line type="monotone" dataKey="Best 90%" stroke="#22c55e" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
-                    <Line type="monotone" dataKey="Median" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4, fill: "#3b82f6" }} />
-                    <Line type="monotone" dataKey="Worst 10%" stroke="#ef4444" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
-                  </LineChart>
-                </ResponsiveContainer>
+                <div className="h-[220px] sm:h-[260px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                      <XAxis dataKey="month" tick={{ fill: "#6b7280", fontSize: 11 }} />
+                      <YAxis tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} tick={{ fill: "#6b7280", fontSize: 11 }} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "#111827", border: "1px solid #374151", borderRadius: 8 }}
+                        formatter={(v: number | undefined) => [`$${(v ?? 0).toLocaleString()}`, ""]}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 11, color: "#6b7280" }} />
+                      <Line type="monotone" dataKey="Best 90%" stroke="#22c55e" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+                      <Line type="monotone" dataKey="Median" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4, fill: "#3b82f6" }} />
+                      <Line type="monotone" dataKey="Worst 10%" stroke="#ef4444" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
 
               {/* Recommendation + Smoothing toggle */}
