@@ -35,7 +35,10 @@ function toMonthlyIncome(incomes: { date: string; amount: number }[]): number[] 
   const end = new Date(keys[keys.length - 1] + "-01");
   const cur = new Date(start);
   while (cur <= end) {
-    const k = cur.toISOString().slice(0, 7);
+    //const k = cur.toISOString().slice(0, 7);
+    const y = cur.getFullYear();
+    const m = String(cur.getMonth() + 1).padStart(2, "0");
+    const k = `${y}-${m}`;
     result.push(map[k] ?? 0);
     cur.setMonth(cur.getMonth() + 1);
   }
@@ -104,10 +107,16 @@ function simulate(
             income -= excess * smoothPct;
           }
           // Also release from buffer on low months
-          if (applySmoothing && income < avgIncome && buffer > 0) {
+          /*if (applySmoothing && income < avgIncome && buffer > 0) {
             const shortfall = avgIncome - income;
             const release = Math.min(shortfall * 0.5, buffer * 0.3);
             buffer += release;
+          }*/
+          if (applySmoothing && income < avgIncome && buffer > 0) {
+            const gap = avgIncome - income;
+            const release = Math.min(gap * 0.5, buffer * 0.3);
+            buffer -= release;     // buffer goes down
+            income += release;     // spendable cash goes up
           }
 
       buffer += income - expenses;
