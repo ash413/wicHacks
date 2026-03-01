@@ -197,7 +197,12 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   //const [baselineShortfall, setBaselineShortfall] = useState<number | null>(null);
-  
+
+  //NESSIE PHASE
+
+  const [nessieLoading, setNessieLoading] = useState(false);
+  const [nessieStatus, setNessieStatus] = useState<"idle" | "success" | "error">("idle");
+
 
   function loadProfile(profile: ProfileInput) {
     setIncomes([...profile.incomes]);
@@ -264,6 +269,34 @@ export default function Home() {
       setSmoothing(false);
     } catch {
       setError(`Failed to load ${profile.csvFile}`);
+    }
+  }
+
+  //PHASE : NESSIE FUNCTION 
+
+  async function connectNessie() {
+    setNessieLoading(true);
+    setNessieStatus("idle");
+    try {
+      const res = await fetch("/api/nessie");
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setNessieStatus("error");
+        setError("Nessie unavailable — using local profiles");
+        return;
+      }
+      setIncomes(data.incomes);
+      setBuffer(data.currentBalance);
+      setExpenses(2200);
+      setResult(null);
+      setSmoothing(false);
+      setError("");
+      setNessieStatus("success");
+    } catch {
+      setNessieStatus("error");
+      setError("Nessie unavailable — using local profiles");
+    } finally {
+      setNessieLoading(false);
     }
   }
 
@@ -341,6 +374,32 @@ export default function Home() {
                 ))}
               </div>
             </div>
+
+            {/* Nessie Connect */}
+            <div className="border-t border-gray-800 pt-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500">Live bank data:</span>
+                {nessieStatus === "success" && (
+                  //<span className="text-xs text-green-400 font-semibold">✅ Nessie connected</span>
+                  <span className="text-xs text-green-400 font-semibold">✅ Nessie connected · Gig Income Account</span>
+                )}
+                {nessieStatus === "error" && (
+                  <span className="text-xs text-red-400">⚠️ Unavailable</span>
+                )}
+              </div>
+              <button
+                onClick={connectNessie}
+                disabled={nessieLoading}
+                className={`mt-2 w-full text-xs px-3 py-2 rounded-lg border transition-colors font-semibold ${
+                  nessieStatus === "success"
+                    ? "bg-green-950 border-green-700 text-green-300"
+                    : "bg-gray-800 border-gray-600 hover:border-blue-500 text-gray-300"
+                }`}
+              >
+                {nessieLoading ? "Connecting..." : nessieStatus === "success" ? "🏦 Nessie Data Loaded" : "🏦 Connect Nessie (Capital One)"}
+              </button>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-gray-400">Monthly Expenses ($)</label>
