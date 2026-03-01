@@ -12,12 +12,16 @@ async function post(path: string, body: object) {
   return data;
 }
 
-async function seed() {
-  // 1. Create customer
-  console.log("\n--- Creating customer ---");
+async function seedProfile(
+  firstName: string,
+  lastName: string,
+  nickname: string,
+  deposits: { date: string; amount: number }[]
+) {
+  console.log(`\n--- Creating customer: ${firstName} ${lastName} ---`);
   const customerRes = await post("/customers", {
-    first_name: "Alex",
-    last_name: "GigWorker",
+    first_name: firstName,
+    last_name: lastName,
     address: {
       street_number: "123",
       street_name: "Main St",
@@ -27,50 +31,76 @@ async function seed() {
     },
   });
   const customerId = customerRes.objectCreated?._id;
-  if (!customerId) { console.error("Failed to create customer"); return; }
-  console.log("Customer ID:", customerId);
+  if (!customerId) { console.error("Failed to create customer"); return null; }
 
-  // 2. Create checking account
-  console.log("\n--- Creating checking account ---");
+  console.log(`--- Creating account: ${nickname} ---`);
   const accountRes = await post(`/customers/${customerId}/accounts`, {
     type: "Checking",
-    nickname: "Gig Income Account",
+    nickname,
     rewards: 0,
-    balance: 1800,
+    balance: deposits[deposits.length - 1]?.amount ?? 2000,
   });
   const accountId = accountRes.objectCreated?._id;
-  if (!accountId) { console.error("Failed to create account"); return; }
-  console.log("Account ID:", accountId);
+  if (!accountId) { console.error("Failed to create account"); return null; }
 
-  // 3. Create deposits (income) for 12 months
-  console.log("\n--- Creating deposits ---");
-  const deposits = [
-    { date: "2024-01-15", amount: 2000 },
-    { date: "2024-02-15", amount: 1900 },
-    { date: "2024-03-15", amount: 2100 },
-    { date: "2024-04-15", amount: 700 },
-    { date: "2024-05-15", amount: 2300 },
-    { date: "2024-06-15", amount: 3200 },
-    { date: "2024-07-15", amount: 3400 },
-    { date: "2024-08-15", amount: 3100 },
-    { date: "2024-09-15", amount: 2500 },
-    { date: "2024-10-15", amount: 4800 },
-    { date: "2024-11-15", amount: 2200 },
-    { date: "2024-12-15", amount: 1500 },
-  ];
-
+  console.log(`--- Creating ${deposits.length} deposits ---`);
   for (const d of deposits) {
     await post(`/accounts/${accountId}/deposits`, {
       medium: "balance",
       transaction_date: d.date,
       amount: d.amount,
-      description: "Gig income deposit",
+      description: `${nickname} income deposit`,
     });
   }
 
-  console.log("\n✅ Done! Save these IDs:");
-  console.log(`  Customer ID: ${customerId}`);
-  console.log(`  Account ID:  ${accountId}`);
+  return { customerId, accountId };
+}
+
+async function seed() {
+  // Creator profile
+  const creatorResult = await seedProfile(
+    "Jordan", "Creator",
+    "Creator Income Account",
+    [
+      { date: "2024-01-15", amount: 800 },
+      { date: "2024-02-15", amount: 12000 },
+      { date: "2024-03-15", amount: 1200 },
+      { date: "2024-04-15", amount: 600 },
+      { date: "2024-05-15", amount: 9500 },
+      { date: "2024-06-15", amount: 700 },
+      { date: "2024-07-15", amount: 400 },
+      { date: "2024-08-15", amount: 11000 },
+      { date: "2024-09-15", amount: 900 },
+      { date: "2024-10-15", amount: 500 },
+      { date: "2024-11-15", amount: 8200 },
+      { date: "2024-12-15", amount: 1100 },
+    ]
+  );
+
+  // Freelancer profile
+  const freelancerResult = await seedProfile(
+    "Sam", "Freelancer",
+    "Freelancer Income Account",
+    [
+      { date: "2024-01-15", amount: 5500 },
+      { date: "2024-02-15", amount: 3200 },
+      { date: "2024-03-15", amount: 4800 },
+      { date: "2024-04-15", amount: 2100 },
+      { date: "2024-05-15", amount: 6200 },
+      { date: "2024-06-15", amount: 3900 },
+      { date: "2024-07-15", amount: 2600 },
+      { date: "2024-08-15", amount: 5100 },
+      { date: "2024-09-15", amount: 1800 },
+      { date: "2024-10-15", amount: 4400 },
+      { date: "2024-11-15", amount: 3300 },
+      { date: "2024-12-15", amount: 5800 },
+    ]
+  );
+
+  console.log("\n✅ Done! Add these to your .env.local:");
+  console.log(`NESSIE_ACCOUNT_GIG=69a3afb695150878eaffb595`);
+  if (creatorResult) console.log(`NESSIE_ACCOUNT_CREATOR=${creatorResult.accountId}`);
+  if (freelancerResult) console.log(`NESSIE_ACCOUNT_FREELANCER=${freelancerResult.accountId}`);
 }
 
 seed().catch(console.error);

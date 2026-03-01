@@ -202,6 +202,9 @@ export default function Home() {
 
   const [nessieLoading, setNessieLoading] = useState(false);
   const [nessieStatus, setNessieStatus] = useState<"idle" | "success" | "error">("idle");
+  const [nessieAccountName, setNessieAccountName] = useState<string>("");
+
+  const [activeNessieKey, setActiveNessieKey] = useState<string>("gig");
 
 
   function loadProfile(profile: ProfileInput) {
@@ -212,6 +215,8 @@ export default function Home() {
     setError("");
     setSmoothing(false);
     //setBaselineShortfall(null);
+    setNessieStatus("idle");
+    setNessieAccountName("");
   }
 
   function updateIncome(i: number, field: "date" | "amount", val: string) {
@@ -267,6 +272,12 @@ export default function Home() {
       setResult(null);
       setError("");
       setSmoothing(false);
+      setNessieStatus("idle");
+      setNessieAccountName("");
+      setActiveNessieKey(
+        profile.csvFile.includes("gig") ? "gig" :
+        profile.csvFile.includes("creator") ? "creator" : "freelancer"
+      );
     } catch {
       setError(`Failed to load ${profile.csvFile}`);
     }
@@ -274,7 +285,7 @@ export default function Home() {
 
   //PHASE : NESSIE FUNCTION 
 
-  async function connectNessie() {
+  /*async function connectNessie() {
     setNessieLoading(true);
     setNessieStatus("idle");
     try {
@@ -292,13 +303,75 @@ export default function Home() {
       setSmoothing(false);
       setError("");
       setNessieStatus("success");
+      setNessieAccountName(data.accounts[0]?.nickname ?? "Connected"); 
     } catch {
       setNessieStatus("error");
       setError("Nessie unavailable — using local profiles");
     } finally {
       setNessieLoading(false);
     }
-  }
+  }*/
+
+    /*async function connectNessie() {
+      setNessieLoading(true);
+      setNessieStatus("idle");
+      try {
+        const res = await fetch("/api/nessie");
+        const data = await res.json();
+        if (!res.ok || data.error) {
+          setNessieStatus("error");
+          setError("Nessie unavailable — using local profiles");
+          return;
+        }
+        // Only load Nessie income if no profile is currently loaded
+        // Otherwise just sync the balance
+        if (incomes.length <= 3 && incomes.every(i => i.amount === 0)) {
+          // Empty state — load full Nessie data
+          setIncomes(data.incomes);
+          setExpenses(2200);
+        }
+        // Always sync balance from Nessie
+        setBuffer(data.currentBalance);
+        setResult(null);
+        setSmoothing(false);
+        setError("");
+        setNessieStatus("success");
+        setNessieAccountName(data.accounts[0]?.nickname ?? "Connected");
+      } catch {
+        setNessieStatus("error");
+        setError("Nessie unavailable — using local profiles");
+      } finally {
+        setNessieLoading(false);
+      }
+    }*/
+      async function connectNessie() {
+        setNessieLoading(true);
+        setNessieStatus("idle");
+        try {
+          const res = await fetch(`/api/nessie?profile=${activeNessieKey}`);
+          const data = await res.json();
+          if (!res.ok || data.error) {
+            setNessieStatus("error");
+            setError("Nessie unavailable — using local profiles");
+            return;
+          }
+          // Sync balance from Nessie, keep existing income unless empty
+          if (incomes.length <= 3 && incomes.every(i => i.amount === 0)) {
+            setIncomes(data.incomes);
+          }
+          setBuffer(data.currentBalance);
+          setResult(null);
+          setSmoothing(false);
+          setError("");
+          setNessieStatus("success");
+          setNessieAccountName(data.accountName ?? "Connected");
+        } catch {
+          setNessieStatus("error");
+          setError("Nessie unavailable — using local profiles");
+        } finally {
+          setNessieLoading(false);
+        }
+      }
 
   const chartData = result
     ? result.outcomes.medianTrajectory.map((v, i) => ({
@@ -339,19 +412,19 @@ export default function Home() {
             <div className="flex flex-col gap-2">
               <span className="text-xs text-gray-500">Load sample profile:</span>
               <div className="flex gap-2 flex-wrap">
-                {[
-                  { label: "🚗 Gig Worker", profile: gigWorkerProfile },
-                  { label: "🎨 Creator", profile: creatorProfile },
-                  { label: "💻 Freelancer", profile: freelancerProfile },
-                ].map(({ label, profile }) => (
-                  <button
-                    key={label}
-                    onClick={() => loadProfile(profile)}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
-                  >
-                    {label}
-                  </button>
-                ))}
+              {[
+                { label: "🚗 Gig Worker", profile: gigWorkerProfile, nessieKey: "gig", expenses: 2200 },
+                { label: "🎨 Creator", profile: creatorProfile, nessieKey: "creator", expenses: 2500 },
+                { label: "💻 Freelancer", profile: freelancerProfile, nessieKey: "freelancer", expenses: 2800 },
+              ].map(({ label, profile, nessieKey, expenses: exp }) => (
+                <button
+                  key={label}
+                  onClick={() => { loadProfile(profile); setActiveNessieKey(nessieKey); }}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
+                >
+                  {label}
+                </button>
+              ))}
               </div>
             </div>
 
@@ -381,7 +454,7 @@ export default function Home() {
                 <span className="text-xs text-gray-500">Live bank data:</span>
                 {nessieStatus === "success" && (
                   //<span className="text-xs text-green-400 font-semibold">✅ Nessie connected</span>
-                  <span className="text-xs text-green-400 font-semibold">✅ Nessie connected · Gig Income Account</span>
+                  <span className="text-xs text-green-400 font-semibold">✅ Nessie connected · {nessieAccountName}</span>
                 )}
                 {nessieStatus === "error" && (
                   <span className="text-xs text-red-400">⚠️ Unavailable</span>

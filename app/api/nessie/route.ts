@@ -1,46 +1,53 @@
 import { NextResponse } from "next/server";
-import { fetchNessieProfile } from "@/lib/adapters/nessie";
+import { nessieToIncomePoints } from "@/lib/adapters/nessie";
 
-// Cache response in memory to survive demo conditions
-//let cache: { data: unknown; fetchedAt: number } | null = null;
-let cache: { data: Record<string, unknown>; fetchedAt: number } | null = null;
-const CACHE_TTL = 1000 * 60 * 10; // 10 minutes
+const ACCOUNT_IDS: Record<string, string> = {
+  gig: process.env.NESSIE_ACCOUNT_GIG ?? "",
+  creator: process.env.NESSIE_ACCOUNT_CREATOR ?? "",
+  freelancer: process.env.NESSIE_ACCOUNT_FREELANCER ?? "",
+};
 
-export async function GET() {
+const ACCOUNT_NAMES: Record<string, string> = {
+  gig: "Gig Income Account",
+  creator: "Creator Income Account",
+  freelancer: "Freelancer Income Account",
+};
+
+const BALANCES: Record<string, number> = {
+  gig: 1800,
+  creator: 2000,
+  freelancer: 5000,
+};
+
+// Per-profile cache
+const cache: Record<string, { data: Record<string, unknown>; fetchedAt: number }> = {};
+const CACHE_TTL = 1000 * 60 * 10;
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const profile = searchParams.get("profile") ?? "gig";
+
+  if (!ACCOUNT_IDS[profile]) {
+    return NextResponse.json({ error: `Unknown profile: ${profile}` }, { status: 400 });
+  }
+
   try {
-    // Return cached data if fresh
-    if (cache && Date.now() - cache.fetchedAt < CACHE_TTL) {
-      return NextResponse.json({ ...cache.data, cached: true });
+    // Return cached if fresh
+    if (cache[profile] && Date.now() - cache[profile].fetchedAt < CACHE_TTL) {
+      return NextResponse.json({ ...cache[profile].data, cached: true });
     }
 
-    const profile = await fetchNessieProfile();
-
-    // Flatten all income points across accounts
-    const allIncome = Object.values(profile.incomeByAccount).flat();
-
-    // Group by month and sum across all accounts
-    const monthMap: Record<string, number> = {};
-    for (const { date, amount } of allIncome) {
-      monthMap[date] = (monthMap[date] ?? 0) + amount;
-    }
-
-    const incomes = Object.entries(monthMap)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, amount]) => ({ date, amount }));
+    const accountId = ACCOUNT_IDS[profile];
+    const incomes = await nessieToIncomePoints(accountId);
 
     const result = {
       incomes,
-      currentBalance: profile.currentBalance,
-      accountCount: profile.accounts.length,
-      accounts: profile.accounts.map(a => ({
-        id: a._id,
-        nickname: a.nickname,
-        type: a.type,
-        balance: a.balance,
-      })),
+      currentBalance: BALANCES[profile],
+      accountName: ACCOUNT_NAMES[profile],
+      profile,
     };
 
-    cache = { data: result, fetchedAt: Date.now() };
+    cache[profile] = { data: result, fetchedAt: Date.now() };
     return NextResponse.json(result);
 
   } catch (err) {
