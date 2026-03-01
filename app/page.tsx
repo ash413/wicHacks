@@ -291,7 +291,7 @@ export default function Home() {
           monthlyExpenses: expenses,
           currentBuffer: buffer,
           horizonMonths: 3,
-          simulations: 1000,
+          simulations: 2000,
           applySmoothing: useSmoothing,
         }),
       });
