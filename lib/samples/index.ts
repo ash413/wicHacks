@@ -62,3 +62,31 @@ export const freelancerProfile: ProfileInput = {
     { date: "2024-12", amount: 5800 },
   ],
 };
+
+// ─── 60-month CSV profile configs ────────────────────────────
+export const gigWorker60Profile = {
+  label: "🚗 Gig Worker (5yr)",
+  csvFile: "gig_60mo.csv",
+  monthlyExpenses: 2200,
+  currentBuffer: 1800,
+  horizonMonths: 3,
+  simulations: 2000,
+};
+
+export const creator60Profile = {
+  label: "🎨 Creator (5yr)",
+  csvFile: "creator_60mo.csv",
+  monthlyExpenses: 2500,
+  currentBuffer: 2000,
+  horizonMonths: 3,
+  simulations: 2000,
+};
+
+export const freelancer60Profile = {
+  label: "💻 Freelancer (5yr)",
+  csvFile: "freelancer_60mo.csv",
+  monthlyExpenses: 2800,
+  currentBuffer: 5000,
+  horizonMonths: 3,
+  simulations: 2000,
+};

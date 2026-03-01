@@ -8,6 +8,9 @@ import {
 import { gigWorkerProfile, creatorProfile, freelancerProfile } from "@/lib/samples";
 import { ProfileInput, AnalysisOutput } from "@/types";
 
+import { loadCSVProfile } from "@/lib/adapters/loadCSV";
+import { gigWorker60Profile, creator60Profile, freelancer60Profile } from "@/lib/samples";
+
 function KPICard({
   label, value, sub, color, badge
 }: { label: string; value: string; sub: string; color: string; badge?: string }) {
@@ -250,6 +253,20 @@ export default function Home() {
     }
   }
 
+  async function load60Profile(profile: typeof gigWorker60Profile) {
+    try {
+      const incomes = await loadCSVProfile(profile.csvFile);
+      setIncomes(incomes);
+      setExpenses(profile.monthlyExpenses);
+      setBuffer(profile.currentBuffer);
+      setResult(null);
+      setError("");
+      setSmoothing(false);
+    } catch {
+      setError(`Failed to load ${profile.csvFile}`);
+    }
+  }
+
   const chartData = result
     ? result.outcomes.medianTrajectory.map((v, i) => ({
         month: i === 0 ? "Now" : `Month ${i}`,
@@ -284,6 +301,8 @@ export default function Home() {
         <div className="lg:col-span-1 flex flex-col gap-6">
           <div className="rounded-2xl border border-gray-800 bg-gray-900 p-6 flex flex-col gap-4">
             <h2 className="text-sm font-semibold uppercase tracking-widest text-gray-400">Profile</h2>
+
+            {/* 1-year sample profiles */}
             <div className="flex flex-col gap-2">
               <span className="text-xs text-gray-500">Load sample profile:</span>
               <div className="flex gap-2 flex-wrap">
@@ -296,6 +315,26 @@ export default function Home() {
                     key={label}
                     onClick={() => loadProfile(profile)}
                     className="text-xs px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 5-year profiles */}
+            <div className="flex flex-col gap-2">
+              <span className="text-xs text-gray-500">Load 5-year profile:</span>
+              <div className="flex gap-2 flex-wrap">
+                {[
+                  { label: "🚗 Gig Worker (5yr)", profile: gigWorker60Profile },
+                  { label: "🎨 Creator (5yr)", profile: creator60Profile },
+                  { label: "💻 Freelancer (5yr)", profile: freelancer60Profile },
+                ].map(({ label, profile }) => (
+                  <button
+                    key={label}
+                    onClick={() => load60Profile(profile)}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-blue-950 hover:bg-blue-900 border border-blue-800 text-blue-300 transition-colors"
                   >
                     {label}
                   </button>
@@ -411,7 +450,7 @@ export default function Home() {
                     3-Month Buffer Simulation
                     {smoothing && <span className="ml-2 text-green-400 normal-case font-normal text-xs">· Smoothing Plan Active</span>}
                   </h2>
-                  <span className="text-xs text-gray-600">1,000 simulations · bootstrap sampling</span>
+                  <span className="text-xs text-gray-600">2,000 simulations · bootstrap sampling</span>
                 </div>
                 <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={chartData}>
